@@ -11,7 +11,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// HandleMessage обрабатывает текстовые сообщения
+// обрабатывает текстовые сообщения
 func HandleMessage(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
 
@@ -23,14 +23,13 @@ func HandleMessage(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			),
 		)
 	} else {
-		// Обрабатываем как название города
 		go HandleCity(bot, update)
 	}
 
 	bot.Send(msg)
 }
 
-// HandleCity обрабатывает поиск достопримечательностей по городу
+// обрабатывает поиск достопримечательностей по городу
 func HandleCity(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
 
@@ -51,16 +50,14 @@ func HandleCity(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	bot.Send(msg)
 }
 
-// HandleLocation обрабатывает сообщения с геолокацией
+// обрабатывает сообщения с геолокацией
 func HandleLocation(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
 
-	// Получаем достопримечательности вокруг локации
-	// Используем небольшой радиус (0.001) для поиска поблизости
 	attractions, err := api.GetAttractionsByLocation(
 		update.Message.Location.Latitude,
 		update.Message.Location.Longitude,
-		0.001, // небольшой радиус для поиска поблизости
+		0.001,
 	)
 
 	if err != nil {
@@ -76,7 +73,7 @@ func HandleLocation(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	bot.Send(msg)
 }
 
-// HandleCallback обрабатывает callback-и от inline кнопок
+// обрабатывает callback-и от inline кнопок
 func HandleCallback(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
 	bot.Send(callback)
