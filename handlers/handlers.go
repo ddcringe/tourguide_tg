@@ -33,6 +33,24 @@ type PaginationState struct {
 // Глобальная map для хранения состояний пагинации по chatID
 var paginationStates = make(map[int64]*PaginationState)
 
+func HandleMessage(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
+
+	if update.Message.Text == "/start" {
+		msg.Text = "👋 Привет! Я помогу найти интересные достопримечательности.\n\n📍 Отправь мне название города (например: \"Москва\", \"Санкт-Петербург\")\n🗺️ Или отправь свою геолокацию для поиска рядом с тобой"
+		msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
+			tgbotapi.NewKeyboardButtonRow(
+				tgbotapi.NewKeyboardButtonLocation("📍 Отправить геолокацию"),
+			),
+		)
+	} else {
+		// Обрабатываем как название города
+		go HandleCity(bot, update)
+	}
+
+	bot.Send(msg)
+}
+
 // обрабатывает поиск достопримечательностей по городу
 func HandleCity(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
