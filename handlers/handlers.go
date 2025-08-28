@@ -8,6 +8,7 @@ import (
 	"strings"
 	"tg-bot/api"
 	"tg-bot/models"
+	"unicode/utf8"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -55,19 +56,28 @@ func HandleMessage(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 func HandleCity(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
 
-	cityName := update.Message.Text
+	// Очищаем название города
+	cityName := cleanUTF8(update.Message.Text)
 
 	// Получаем достопримечательности по городу через API
 	attractions, err := api.GetAttractionsByCity(cityName)
 	if err != nil {
 		log.Printf("Ошибка при запросе к API: %v", err)
-		msg.Text = " Ошибка при поиске достопримечательностей. Попробуйте позже."
+		msg.Text = "❌ Ошибка при поиске достопримечательностей. Попробуйте позже."
 		bot.Send(msg)
 		return
 	}
 
+	// Очищаем полученные данные
+	for i := range attractions {
+		attractions[i].Name = cleanUTF8(attractions[i].Name)
+		attractions[i].Address = cleanUTF8(attractions[i].Address)
+		attractions[i].Description = cleanUTF8(attractions[i].Description)
+		attractions[i].City = cleanUTF8(attractions[i].City)
+	}
+
 	if len(attractions) == 0 {
-		msg.Text = fmt.Sprintf("🏙️ В городе \"%s\" не найдено достопримечательностей \nПопробуйте другой город или проверьте написание.", cityName)
+		msg.Text = safeFormat("🏙️ В городе \"%s\" не найдено достопримечательностей 😢\nПопробуйте другой город или проверьте написание.", cityName)
 		bot.Send(msg)
 		return
 	}
@@ -99,6 +109,12 @@ func HandleLocation(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		update.Message.Location.Longitude,
 		0.01,
 	)
+	for i := range attractions {
+		attractions[i].Name = cleanUTF8(attractions[i].Name)
+		attractions[i].Address = cleanUTF8(attractions[i].Address)
+		attractions[i].Description = cleanUTF8(attractions[i].Description)
+		attractions[i].City = cleanUTF8(attractions[i].City)
+	}
 
 	if err != nil {
 		log.Printf("Ошибка при запросе геолокации: %v", err)
@@ -135,6 +151,38 @@ func HandleLocation(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	// Отправляем первую страницу
 	sendAttractionsPage(bot, update.Message.Chat.ID, 0)
 }
+func cleanUTF8(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+
+	// Если строка содержит невалидные UTF8 символы, очищаем их
+	v := make([]rune, 0, len(s))
+	for i, r := range s {
+		if r == utf8.RuneError {
+			_, size := utf8.DecodeRuneInString(s[i:])
+			if size == 1 {
+				continue // Пропускаем невалидный символ
+			}
+		}
+		v = append(v, r)
+	}
+	return string(v)
+}
+
+// Функция для безопасного форматирования строки
+func safeFormat(format string, args ...interface{}) string {
+	// Очищаем все аргументы
+	cleanArgs := make([]interface{}, len(args))
+	for i, arg := range args {
+		if s, ok := arg.(string); ok {
+			cleanArgs[i] = cleanUTF8(s)
+		} else {
+			cleanArgs[i] = arg
+		}
+	}
+	return fmt.Sprintf(format, cleanArgs...)
+}
 
 // отправляет страницу с достопримечательностями
 func sendAttractionsPage(bot *tgbotapi.BotAPI, chatID int64, page int) {
@@ -162,10 +210,10 @@ func sendAttractionsPage(bot *tgbotapi.BotAPI, chatID int64, page int) {
 	// Формируем заголовок сообщения в зависимости от типа поиска
 	var header string
 	if state.Type == SearchTypeCity {
-		header = fmt.Sprintf(" Достопримечательности в %s (стр. %d/%d):\n\n",
+		header = safeFormat("🏙️ Достопримечательности в %s (стр. %d/%d):\n\n",
 			state.City, page+1, state.TotalPages)
 	} else {
-		header = fmt.Sprintf(" Достопримечательности рядом с вами (стр. %d/%d):\n\n",
+		header = safeFormat("📍 Достопримечательности рядом с вами (стр. %d/%d):\n\n",
 			page+1, state.TotalPages)
 	}
 
@@ -175,19 +223,25 @@ func sendAttractionsPage(bot *tgbotapi.BotAPI, chatID int64, page int) {
 
 	for i := start; i < end; i++ {
 		attr := state.Attractions[i]
+
+		// Очищаем все текстовые поля
+		cleanName := cleanUTF8(attr.Name)
+		cleanAddress := cleanUTF8(attr.Address)
+		cleanDescription := cleanUTF8(attr.Description)
+
 		ratingText := ""
 		if attr.Rating > 0 {
-			ratingText = fmt.Sprintf(" ( %.1f)", attr.Rating)
+			ratingText = safeFormat(" (⭐ %.1f)", attr.Rating)
 		}
 
-		builder.WriteString(fmt.Sprintf("%d. %s%s\n", i+1, attr.Name, ratingText))
+		builder.WriteString(safeFormat("%d. %s%s\n", i+1, cleanName, ratingText))
 
-		if attr.Address != "" {
-			builder.WriteString(fmt.Sprintf("    %s\n", truncateString(attr.Address, 50)))
+		if cleanAddress != "" {
+			builder.WriteString(safeFormat("   📍 %s\n", truncateString(cleanAddress, 50)))
 		}
 
-		if attr.Description != "" {
-			builder.WriteString(fmt.Sprintf("    %s\n", truncateString(attr.Description, 50)))
+		if cleanDescription != "" {
+			builder.WriteString(safeFormat("   📝 %s\n", truncateString(cleanDescription, 50)))
 		}
 
 		builder.WriteString("\n")
@@ -198,6 +252,7 @@ func sendAttractionsPage(bot *tgbotapi.BotAPI, chatID int64, page int) {
 
 	msg := tgbotapi.NewMessage(chatID, builder.String())
 	msg.ReplyMarkup = keyboard
+	msg.ParseMode = "HTML" // Используем HTML parse mode для лучшей совместимости
 	bot.Send(msg)
 }
 
@@ -293,45 +348,57 @@ func truncateString(s string, maxLength int) string {
 func formatAttractionDetail(detail models.AttractionDetail) string {
 	var builder strings.Builder
 
-	builder.WriteString(fmt.Sprintf(" *%s*\n\n", detail.Name))
+	// Очищаем все текстовые поля
+	cleanName := cleanUTF8(detail.Name)
+	cleanAddress := cleanUTF8(detail.Address)
+	cleanCity := cleanUTF8(detail.City)
+	cleanFullDescription := cleanUTF8(detail.FullDescription)
+	cleanDescription := cleanUTF8(detail.Description)
+	cleanWorkingHours := cleanUTF8(detail.WorkingHours)
+	cleanPhone := cleanUTF8(detail.Phone)
+	cleanWebsite := cleanUTF8(detail.Website)
+	cleanCost := cleanUTF8(detail.Cost)
 
-	if detail.Address != "" {
-		builder.WriteString(fmt.Sprintf(" *Адрес:* %s\n", detail.Address))
+	builder.WriteString(safeFormat("<b>🏛️ %s</b>\n\n", cleanName))
+
+	if cleanAddress != "" {
+		builder.WriteString(safeFormat("📍 <b>Адрес:</b> %s\n", cleanAddress))
 	}
 
-	if detail.City != "" {
-		builder.WriteString(fmt.Sprintf("*Город:* %s\n", detail.City))
+	if cleanCity != "" {
+		builder.WriteString(safeFormat("🏙️ <b>Город:</b> %s\n", cleanCity))
 	}
 
-	if detail.FullDescription != "" {
-		builder.WriteString(fmt.Sprintf("\n*Описание:* %s\n", truncateString(detail.FullDescription, 200)))
-	} else if detail.Description != "" {
-		builder.WriteString(fmt.Sprintf("\n *Описание:* %s\n", truncateString(detail.Description, 200)))
+	if cleanFullDescription != "" {
+		builder.WriteString(safeFormat("\n📖 <b>Описание:</b> %s\n", truncateString(cleanFullDescription, 200)))
+	} else if cleanDescription != "" {
+		builder.WriteString(safeFormat("\n📖 <b>Описание:</b> %s\n", truncateString(cleanDescription, 200)))
 	}
 
-	if detail.WorkingHours != "" {
-		builder.WriteString(fmt.Sprintf("*Часы работы:* %s\n", detail.WorkingHours))
+	if cleanWorkingHours != "" {
+		builder.WriteString(safeFormat("🕒 <b>Часы работы:</b> %s\n", cleanWorkingHours))
 	}
 
-	if detail.Phone != "" {
-		builder.WriteString(fmt.Sprintf(" *Телефон:* %s\n", detail.Phone))
+	if cleanPhone != "" {
+		builder.WriteString(safeFormat("📞 <b>Телефон:</b> %s\n", cleanPhone))
 	}
 
-	if detail.Website != "" {
-		builder.WriteString(fmt.Sprintf(" *Сайт:* %s\n", detail.Website))
+	if cleanWebsite != "" {
+		builder.WriteString(safeFormat("🌐 <b>Сайт:</b> %s\n", cleanWebsite))
 	}
 
-	if detail.Cost != "" {
-		builder.WriteString(fmt.Sprintf(" *Стоимость:* %s\n", detail.Cost))
+	if cleanCost != "" {
+		builder.WriteString(safeFormat("💵 <b>Стоимость:</b> %s\n", cleanCost))
 	}
 
 	if detail.Rating > 0 {
-		builder.WriteString(fmt.Sprintf("\n *Рейтинг:* %.1f/5\n", detail.Rating))
+		builder.WriteString(safeFormat("\n⭐ <b>Рейтинг:</b> %.1f/5\n", detail.Rating))
 	}
 
 	// Добавляем фото, если есть
 	if detail.MainPhotoURL != "" {
-		builder.WriteString(fmt.Sprintf("\n [Фото](%s)", detail.MainPhotoURL))
+		cleanPhotoURL := cleanUTF8(detail.MainPhotoURL)
+		builder.WriteString(safeFormat("\n📸 <a href=\"%s\">Фото</a>", cleanPhotoURL))
 	}
 
 	return builder.String()

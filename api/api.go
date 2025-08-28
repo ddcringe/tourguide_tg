@@ -7,7 +7,25 @@ import (
 	"io/ioutil"
 	"net/http"
 	"tg-bot/models"
+	"unicode/utf8"
 )
+
+func cleanUTF8(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	v := make([]rune, 0, len(s))
+	for i, r := range s {
+		if r == utf8.RuneError {
+			_, size := utf8.DecodeRuneInString(s[i:])
+			if size == 1 {
+				continue
+			}
+		}
+		v = append(v, r)
+	}
+	return string(v)
+}
 
 // GetAttractionsByCity получает достопримечательности по городу
 func GetAttractionsByCity(city string) ([]models.Attraction, error) {
@@ -111,5 +129,15 @@ func GetAttractionDetail(id int) (models.AttractionDetail, error) {
 	}
 
 	err = json.Unmarshal(body, &detail)
+	detail.Name = cleanUTF8(detail.Name)
+	detail.Address = cleanUTF8(detail.Address)
+	detail.City = cleanUTF8(detail.City)
+	detail.Description = cleanUTF8(detail.Description)
+	detail.FullDescription = cleanUTF8(detail.FullDescription)
+	detail.WorkingHours = cleanUTF8(detail.WorkingHours)
+	detail.Phone = cleanUTF8(detail.Phone)
+	detail.Website = cleanUTF8(detail.Website)
+	detail.Cost = cleanUTF8(detail.Cost)
+	detail.MainPhotoURL = cleanUTF8(detail.MainPhotoURL)
 	return detail, err
 }
