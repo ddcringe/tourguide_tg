@@ -6,11 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"tg-bot/models"
 )
-
-var baseURL = os.Getenv("API_URL")
 
 type CityRequest struct {
 	City string `json:"city"`
@@ -32,7 +29,7 @@ func GetAttractionsByCity(city string) ([]models.Attraction, error) {
 	}
 
 	// Создаем POST запрос
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/cities/", baseURL), bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/cities/", "https://tourguideyar.ru/api"), bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +61,7 @@ func GetAttractionsByCity(city string) ([]models.Attraction, error) {
 func GetAttractionsByLocation(lat, lon float64, radius float64) ([]models.Attraction, error) {
 	// Формируем URL с query-параметрами
 	url := fmt.Sprintf("%s/map/attractions/?lat=%f&lng=%f&radius=%f",
-		baseURL, lat, lon, radius)
+		"https://tourguideyar.ru/api", lat, lon, radius)
 
 	// Создаем GET-запрос
 	req, err := http.NewRequest("GET", url, nil)
@@ -98,7 +95,7 @@ func GetAttractionsByLocation(lat, lon float64, radius float64) ([]models.Attrac
 func GetAttractionDetail(id int) (models.AttractionDetail, error) {
 	var detail models.AttractionDetail
 
-	resp, err := http.Get(fmt.Sprintf("%s/attractions/%d/", baseURL, id))
+	resp, err := http.Get(fmt.Sprintf("%s/attractions/%d/", "https://tourguideyar.ru/api", id))
 	if err != nil {
 		return detail, err
 	}
