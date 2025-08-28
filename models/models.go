@@ -31,10 +31,29 @@ type AttractionDetail struct {
 	Longitude       float64  `json:"longitude"`
 	Photos          []string `json:"additional_photos"`
 }
+type CityRequest struct {
+	City string `json:"city"`
+}
 
-// запрос для поиска по координатам
 type LocationRequest struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 	Radius    int     `json:"radius,omitempty"` // в метрах
+}
+type APIResponse struct {
+	Count    int          `json:"count"`
+	Next     string       `json:"next"`
+	Previous string       `json:"previous"`
+	Results  []Attraction `json:"results"`
+}
+
+type CityAPIResponse struct {
+	Attractions []Attraction `json:"attractions"`
+	City        string       `json:"city"`
+	Count       int          `json:"count"`
+}
+type MapAPIResponse struct {
+	Attractions []Attraction `json:"attractions"`
+	Count       int          `json:"count"`
+	Radius      float64      `json:"radius"`
 }

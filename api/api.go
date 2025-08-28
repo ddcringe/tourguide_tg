@@ -9,17 +9,11 @@ import (
 	"tg-bot/models"
 )
 
-type CityRequest struct {
-	City string `json:"city"`
-	//Tags string `json:"tags,omitempty"`
-}
-
-// получает достопримечательности по городу
+// GetAttractionsByCity получает достопримечательности по городу
 func GetAttractionsByCity(city string) ([]models.Attraction, error) {
 	// Создаем запрос с городом
-	cityReq := CityRequest{
+	cityReq := models.CityRequest{
 		City: city,
-		//Tags: tags,
 	}
 
 	// Конвертируем в JSON
@@ -48,16 +42,21 @@ func GetAttractionsByCity(city string) ([]models.Attraction, error) {
 		return nil, err
 	}
 
-	var attractions []models.Attraction
-	err = json.Unmarshal(body, &attractions)
+	// Парсим ответ
+	var cityResponse models.CityAPIResponse
+	err = json.Unmarshal(body, &cityResponse)
 	if err != nil {
+		// Попробуем альтернативный формат ответа
+		var altResponse models.APIResponse
+		if altErr := json.Unmarshal(body, &altResponse); altErr == nil {
+			return altResponse.Results, nil
+		}
 		return nil, err
 	}
 
-	return attractions, nil
+	return cityResponse.Attractions, nil
 }
 
-// получает достопримечательности по координатам
 func GetAttractionsByLocation(lat, lon float64, radius float64) ([]models.Attraction, error) {
 	// Формируем URL с query-параметрами
 	url := fmt.Sprintf("%s/map/attractions/?lat=%f&lng=%f&radius=%f",
@@ -82,16 +81,21 @@ func GetAttractionsByLocation(lat, lon float64, radius float64) ([]models.Attrac
 		return nil, err
 	}
 
-	var attractions []models.Attraction
-	err = json.Unmarshal(body, &attractions)
+	// Парсим ответ
+	var mapResponse models.MapAPIResponse
+	err = json.Unmarshal(body, &mapResponse)
 	if err != nil {
+		// Попробуем альтернативный формат ответа
+		var altResponse models.APIResponse
+		if altErr := json.Unmarshal(body, &altResponse); altErr == nil {
+			return altResponse.Results, nil
+		}
 		return nil, err
 	}
 
-	return attractions, nil
+	return mapResponse.Attractions, nil
 }
 
-// получает детальную информацию о достопримечательности
 func GetAttractionDetail(id int) (models.AttractionDetail, error) {
 	var detail models.AttractionDetail
 
